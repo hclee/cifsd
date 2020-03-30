@@ -3955,15 +3955,6 @@ static int get_file_basic_info(struct smb2_query_info_rsp *rsp,
 	struct kstat stat;
 	u64 time;
 
-	if (!(fp->daccess & (FILE_READ_ATTRIBUTES_LE |
-				FILE_GENERIC_READ_LE |
-				FILE_MAXIMAL_ACCESS_LE |
-				FILE_GENERIC_ALL_LE))) {
-		ksmbd_err("no right to read the attributes : 0x%x\n",
-			   fp->daccess);
-		return -EACCES;
-	}
-
 	basic_info = (struct smb2_file_all_info *)rsp->Buffer;
 	generic_fillattr(FP_INODE(fp), &stat);
 
@@ -4403,6 +4394,15 @@ static int smb2_get_info_file(struct ksmbd_work *work,
 	fp = ksmbd_lookup_fd_slow(work, id, pid);
 	if (!fp)
 		return -ENOENT;
+
+	if (!(fp->daccess & (FILE_READ_ATTRIBUTES_LE |
+				FILE_GENERIC_READ_LE |
+				FILE_MAXIMAL_ACCESS_LE |
+				FILE_GENERIC_ALL_LE))) {
+		ksmbd_err("no right to read the attributes : 0x%x\n",
+			   fp->daccess);
+		return -EACCES;
+	}
 
 	fileinfoclass = req->FileInfoClass;
 
