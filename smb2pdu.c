@@ -2318,6 +2318,7 @@ int smb2_open(struct ksmbd_work *work)
 	int share_ret, need_truncate = 0;
 	u64 time;
 	umode_t posix_mode = 0;
+	const struct cred *saved_cred = NULL;
 
 	rsp_org = RESPONSE_BUF(work);
 	WORK_BUFFERS(work, req, rsp);
@@ -2538,6 +2539,13 @@ int smb2_open(struct ksmbd_work *work)
 		}
 	}
 
+	saved_cred = ksmbd_override_fsids(work->sess, work->tcon->share_conf);
+	if (IS_ERR_OR_NULL(saved_cred)) {
+		ksmbd_debug("failed to override fsids\n");
+		rc = -ENOMEM;
+		goto err_out;
+	}
+
 	if (req->CreateOptions & FILE_DELETE_ON_CLOSE_LE) {
 		/*
 		 * On delete request, instead of following up, need to
@@ -2662,6 +2670,25 @@ int smb2_open(struct ksmbd_work *work)
 				rc = 0;
 			else if (rc)
 				goto err_out;
+		}
+	} else {
+		int oflags, acc_mode;
+
+		oflags = open_flags & O_ACCMODE;
+		acc_mode = 0;
+
+		if (oflags == O_RDONLY)
+			acc_mode = MAY_READ;
+		else if (oflags == O_WRONLY)
+			acc_mode = MAY_WRITE;
+		else if (open_flags == O_RDWR)
+			acc_mode = MAY_READ | MAY_WRITE;
+
+		if (inode_permission(d_inode(path.dentry),
+					MAY_OPEN | acc_mode)) {
+			ksmbd_debug("User does not have right permission\n");
+			rc = -EACCES;
+			goto err_out;
 		}
 	}
 
@@ -2964,6 +2991,7 @@ reconnected:
 err_out:
 	if (file_present || created)
 		path_put(&path);
+	ksmbd_revert_fsids(saved_cred);
 err_out1:
 	if (rc) {
 		if (rc == -EINVAL)
