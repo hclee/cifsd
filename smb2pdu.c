@@ -5167,14 +5167,6 @@ static int set_file_basic_info(struct ksmbd_file *fp,
 	struct inode *inode;
 	int rc;
 
-	if (!(fp->daccess & (FILE_WRITE_ATTRIBUTES_LE |
-				FILE_GENERIC_WRITE_LE |
-				FILE_MAXIMAL_ACCESS_LE |
-				FILE_GENERIC_ALL_LE))) {
-		ksmbd_err("Not permitted to write attrs: 0x%x\n", fp->daccess);
-		return -EACCES;
-	}
-
 	file_info = (struct smb2_file_all_info *)buf;
 	attrs.ia_valid = 0;
 	filp = fp->filp;
@@ -5471,6 +5463,14 @@ static int smb2_set_info_file(struct ksmbd_work *work,
 			      char *buf,
 			      struct ksmbd_share_config *share)
 {
+	if (!(fp->daccess & (FILE_WRITE_ATTRIBUTES_LE |
+				FILE_GENERIC_WRITE_LE |
+				FILE_MAXIMAL_ACCESS_LE |
+				FILE_GENERIC_ALL_LE))) {
+		ksmbd_err("Not permitted to write attrs: 0x%x\n", fp->daccess);
+		return -EACCES;
+	}
+
 	switch (info_class) {
 	case FILE_BASIC_INFORMATION:
 		return set_file_basic_info(fp, buf, share);
@@ -5498,19 +5498,8 @@ static int smb2_set_info_file(struct ksmbd_work *work,
 		return set_file_disposition_info(fp, buf);
 
 	case FILE_FULL_EA_INFORMATION:
-	{
-		if (!(fp->daccess & (FILE_WRITE_EA_LE |
-				FILE_GENERIC_WRITE_LE |
-				FILE_MAXIMAL_ACCESS_LE |
-				FILE_GENERIC_ALL_LE))) {
-			ksmbd_err("Not permitted to write ext  attr: 0x%x\n",
-				  fp->daccess);
-			return -EACCES;
-		}
-
 		return smb2_set_ea((struct smb2_ea_info *)buf,
 				   &fp->filp->f_path);
-	}
 
 	case FILE_POSITION_INFORMATION:
 		return set_file_position_info(fp, buf);
